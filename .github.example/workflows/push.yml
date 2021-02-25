@@ -1,0 +1,87 @@
+name: Push
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - hotfix/*
+      - release/*
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '10.x'
+          registry-url: https://nexus.greatminds.dev/repository/npm/
+
+      - name: NPM Install
+        run: npm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:ci:cov
+
+      - name: Publish Test Reports
+        run: .github/publish-test-reports.sh
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Publish Coverage Reports
+        run: .github/publish-coverage-reports.sh
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '10.x'
+          registry-url: https://nexus.greatminds.dev/repository/npm-private/
+
+      - name: Nexus Docker Registry Login
+        run: docker login -u $REGISTRY_USERNAME -p $REGISTRY_PASSWORD $REGISTRY
+        env:
+          REGISTRY: nexus.greatminds.dev:8989
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: ECR Login
+        shell: bash
+        run: /bin/sh -c "aws ecr get-login --no-include-email --region us-east-1" | sh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Build Docker Image
+        run: .github/docker-build.sh
+        env:
+          REGISTRY: ${{ secrets.REGISTRY }}
+          AUTH: ${{ secrets.AUTH }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Push Docker Image
+        run: .github/docker-push.sh
+
+      - name: Spinnaker Trigger
+        run: .github/deploy.sh
+
+      - uses: 8398a7/action-slack@v2
+        with:
+          status: ${{ job.status }}
+          author_name: ${{ github.actor }}
+          channel: '#SET-ME-UP'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()

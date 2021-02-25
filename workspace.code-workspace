@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.tslint": true
+    },
+    "[javascript]": {
+      "editor.formatOnSave": true
+    },
+    "[typescript]": {
+      "editor.formatOnSave": true
+    },
+    "[typescriptreact]": {
+      "editor.formatOnSave": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-tslint-plugin",
+      "jpoissonnier.vscode-styled-components"
+    ]
+  }
+}
